@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --glass-bg: rgba(30, 41, 59, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.05);
+}
+
+body {
+  background: radial-gradient(circle at top right, #1e293b, #0f172a);
+  min-height: 100vh;
+  color: #f1f5f9;
+}
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-card {
+  @apply glass rounded-2xl p-6 transition-all duration-300;
+}
+
+.glass-card:hover {
+  @apply bg-slate-800/80 border-slate-700/50;
+  box-shadow: 0 12px 48px 0 rgba(0, 0, 0, 0.5);
+}
+
+.input-field {
+  @apply w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all text-slate-100;
+}
+
+.btn-primary {
+  @apply bg-primary-600 hover:bg-primary-500 text-white font-medium px-6 py-2 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2;
+}
+
+.btn-secondary {
+  @apply bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-6 py-2 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

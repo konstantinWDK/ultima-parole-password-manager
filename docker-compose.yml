@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  ultima-parole:
+    build: .
+    container_name: ultima-parole
+    ports:
+      - "3020:80"
+    restart: unless-stopped
+    networks:
+      - caddy_net
+
+networks:
+  caddy_net:
+    external: true
