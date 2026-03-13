@@ -112,6 +112,11 @@ export default function App() {
     return groups;
   }, [passwords, searchTerm]);
 
+  const uniqueProjects = useMemo(() => {
+    const projects = passwords.map(p => p.project?.trim()).filter(Boolean);
+    return [...new Set(projects)].sort();
+  }, [passwords]);
+
   const toggleGroup = (group) => {
     setExpandedGroups(prev => ({ ...prev, [group]: !prev[group] }));
   };
@@ -200,11 +205,11 @@ export default function App() {
 
       <div className="flex gap-3 mb-8">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-600" />
+          <Search className="absolute left-3 top-3 w-4 h-4 text-slate-600" />
           <input
             type="text"
             placeholder="Buscar en el baúl..."
-            className="input-field pl-9 h-10"
+            className="input-field pl-10 h-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -223,7 +228,18 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input placeholder="Nombre (Ej: GitHub)" className="input-field" value={newEntry.title} onChange={e => setNewEntry({...newEntry, title: e.target.value})} required />
               <input placeholder="Usuario / Email" className="input-field" value={newEntry.username} onChange={e => setNewEntry({...newEntry, username: e.target.value})} />
-              <input placeholder="Proyecto / Tag" className="input-field" value={newEntry.project} onChange={e => setNewEntry({...newEntry, project: e.target.value})} />
+              <div className="relative">
+                <input 
+                  placeholder="Proyecto / Tag" 
+                  list="project-suggestions"
+                  className="input-field" 
+                  value={newEntry.project} 
+                  onChange={e => setNewEntry({...newEntry, project: e.target.value})} 
+                />
+                <datalist id="project-suggestions">
+                  {uniqueProjects.map(p => <option key={p} value={p} />)}
+                </datalist>
+              </div>
             </div>
             <div className="relative group">
               <input placeholder="Contraseña" type="text" className="input-field pr-24" value={newEntry.password} onChange={e => setNewEntry({...newEntry, password: e.target.value})} required />
