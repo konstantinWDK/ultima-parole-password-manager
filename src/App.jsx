@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Lock, Unlock, Plus, Trash2, Copy, Eye, EyeOff, Search, 
   Download, Upload, Shield, LogOut, Key, Check, AlertCircle, ChevronDown, ChevronRight, Folder,
-  ExternalLink
+  ExternalLink, Edit2, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { encryptData, decryptData, generatePassword } from './services/crypto';
@@ -25,6 +25,7 @@ export default function App() {
   const [copiedId, setCopiedId] = useState(null);
   const [error, setError] = useState('');
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [editingId, setEditingId] = useState(null);
   
   // New entry form state
   const [newEntry, setNewEntry] = useState({ title: '', username: '', password: '', project: '', website: '' });
@@ -77,10 +78,30 @@ export default function App() {
     e.preventDefault();
     if (!newEntry.title || !newEntry.password) return;
     
-    const updated = [...passwords, { ...newEntry, id: Date.now() }];
+    let updated;
+    if (editingId) {
+      updated = passwords.map(p => p.id === editingId ? { ...newEntry, id: editingId } : p);
+      setEditingId(null);
+    } else {
+      updated = [...passwords, { ...newEntry, id: Date.now() }];
+    }
+
     handleSaveVault(updated);
     setNewEntry({ title: '', username: '', password: '', project: '', website: '' });
     setIsAdding(false);
+  };
+
+  const startEdit = (entry) => {
+    setNewEntry({ 
+      title: entry.title, 
+      username: entry.username || '', 
+      password: entry.password, 
+      project: entry.project || '', 
+      website: entry.website || '' 
+    });
+    setEditingId(entry.id);
+    setIsAdding(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const deleteEntry = (id) => {
@@ -216,8 +237,16 @@ export default function App() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button onClick={() => setIsAdding(!isAdding)} className="btn-primary px-3 h-10">
-          <Plus size={18} /> <span className="hidden sm:inline">Nueva</span>
+        <button onClick={() => {
+          if (isAdding) {
+            setIsAdding(false);
+            setEditingId(null);
+            setNewEntry({ title: '', username: '', password: '', project: '', website: '' });
+          } else {
+            setIsAdding(true);
+          }
+        }} className="btn-primary px-3 h-10">
+          {isAdding ? <X size={18} /> : <Plus size={18} />} <span className="hidden sm:inline">{isAdding ? "Cancelar" : "Nueva"}</span>
         </button>
       </div>
 
@@ -250,7 +279,24 @@ export default function App() {
                 GENERAR
               </button>
             </div>
-            <button type="submit" className="btn-primary w-full h-10">Guardar Seguro</button>
+            <div className="flex gap-2">
+              <button type="submit" className="btn-primary flex-1 h-10">
+                {editingId ? "Guardar Cambios" : "Guardar Seguro"}
+              </button>
+              {editingId && (
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setEditingId(null);
+                    setIsAdding(false);
+                    setNewEntry({ title: '', username: '', password: '', project: '', website: '' });
+                  }} 
+                  className="btn-secondary px-4 h-10"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
           </motion.form>
         )}
       </AnimatePresence>
@@ -314,6 +360,10 @@ export default function App() {
                           
                           <button onClick={() => copyToClipboard(p.password, p.id)} className={cn("btn-icon", copiedId === p.id && "text-green-500")}>
                             {copiedId === p.id ? <Check size={14} /> : <Copy size={14} />}
+                          </button>
+
+                          <button onClick={() => startEdit(p)} className="btn-icon">
+                            <Edit2 size={14} />
                           </button>
 
                           <button onClick={() => deleteEntry(p.id)} className="btn-icon hover:text-red-500 opacity-0 group-hover:opacity-100">
