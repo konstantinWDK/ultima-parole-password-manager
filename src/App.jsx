@@ -210,6 +210,13 @@ export default function App() {
     }
   };
 
+  const deleteGroup = (project) => {
+    if (confirm(`¿Eliminar el proyecto "${project}" y sus ${passwords.filter(p => (p.project?.trim() || 'General') === project).length} contraseñas?`)) {
+      const updated = passwords.filter(p => (p.project?.trim() || 'General') !== project);
+      handleSaveVault(updated);
+    }
+  };
+
   const copyToClipboard = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -512,16 +519,29 @@ export default function App() {
           </div>
         ) : (
           Object.entries(groupedPasswords).sort().map(([group, items]) => (
-            <div key={group} className="space-y-1">
-              <button 
+            <div key={group} className="space-y-1 group/header">
+              <div 
                 onClick={() => toggleGroup(group)}
-                className="flex items-center gap-2 w-full text-left py-2 px-1 text-slate-500 hover:text-slate-300 transition-colors"
+                className="flex items-center gap-2 w-full text-left py-2 px-1 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
               >
                 {expandedGroups[group] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                 <Folder size={14} className={cn(group === 'General' ? "text-slate-600" : "text-primary-500/50")} />
                 <span className="text-xs font-semibold uppercase tracking-widest">{group}</span>
                 <span className="text-[10px] bg-slate-900 border border-slate-800 px-1.5 rounded-full">{items.length}</span>
-              </button>
+                
+                <div className="flex-1" />
+                
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteGroup(group);
+                  }}
+                  className="opacity-0 group-hover/header:opacity-100 p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded transition-all"
+                  title={`Eliminar grupo ${group}`}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
               
               <AnimatePresence initial={false}>
                 {expandedGroups[group] !== false && (
