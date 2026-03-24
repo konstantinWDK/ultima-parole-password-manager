@@ -9,6 +9,19 @@ services:
     restart: unless-stopped
     networks:
       - caddy_net
+    depends_on:
+      - ultima-parole-backend
+
+  ultima-parole-backend:
+    build: ./server
+    container_name: ultima-parole-backend
+    ports:
+      - "3021:3021"
+    volumes:
+      - ./server/data:/app/data
+    restart: unless-stopped
+    networks:
+      - caddy_net
 
 networks:
   caddy_net:

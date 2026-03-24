@@ -32,44 +32,72 @@ export default function App() {
 
   // Persistence Key
   const STORAGE_KEY = 'ultima_parole_vault';
+  const API_BASE = `http://${window.location.hostname || 'localhost'}:3021/api`;
 
   // Check if vault exists
   useEffect(() => {
     setIsNewVault(!localStorage.getItem(STORAGE_KEY));
   }, []);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    const saved = localStorage.getItem(STORAGE_KEY);
-    
-    if (!saved) {
-      if (masterPassword.length < 4) {
-        setError('Mínimo 4 caracteres');
-        return;
-      }
-      if (masterPassword !== confirmPassword) {
-        setError('No coinciden');
-        return;
-      }
-      setIsLogged(true);
-      setPasswords([]);
-      return;
-    }
-
     try {
-      const encryptedData = JSON.parse(saved);
-      const decrypted = decryptData(encryptedData, masterPassword);
-      setPasswords(decrypted);
+      const saved = localStorage.getItem(STORAGE_KEY);
+      let vaultData = [];
+
+      // First try to fetch from server
+      try {
+        const resp = await fetch(`${API_BASE}/vault`);
+        if (resp.ok) {
+          vaultData = await resp.json();
+          console.log('Vault loaded from server');
+        } else if (saved) {
+          // If server fails but local exists, use local
+          const encryptedData = JSON.parse(saved);
+          vaultData = decryptData(encryptedData, masterPassword);
+        }
+      } catch (e) {
+        console.error('Server sync failed, using local storage');
+        if (saved) {
+          const encryptedData = JSON.parse(saved);
+          vaultData = decryptData(encryptedData, masterPassword);
+        }
+      }
+
+      // If we have saved local but not encrypted (meaning it's the first time with server)
+      // or if we decrypted successfully
+      if (saved && vaultData.length === 0) {
+         try {
+           const encryptedData = JSON.parse(saved);
+           vaultData = decryptData(encryptedData, masterPassword);
+         } catch(e) {}
+      }
+
+      setPasswords(vaultData);
       setIsLogged(true);
     } catch (err) {
       setError('Contraseña incorrecta');
     }
   };
 
-  const handleSaveVault = (updatedPasswords) => {
+  const handleSaveVault = async (updatedPasswords) => {
     const encrypted = encryptData(updatedPasswords, masterPassword);
+    
+    // Save to local storage
     localStorage.setItem(STORAGE_KEY, JSON.stringify(encrypted));
+    
+    // Save to server
+    try {
+      await fetch(`${API_BASE}/vault`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(encrypted)
+      });
+    } catch (e) {
+      console.error('Failed to save to server');
+    }
+
     setPasswords(updatedPasswords);
     setIsNewVault(false);
   };

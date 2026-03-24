@@ -1,42 +1,51 @@
 # 🔐 Ultima Parole
 
-**Ultima Parole** es un gestor de contraseñas privado, ligero y seguro, diseñado con una estética SaaS minimalista. Funciona bajo el principio de **Zero-Knowledge**, lo que significa que tus datos nunca salen de tu navegador en formato legible.
+**Ultima Parole** es un gestor de contraseñas privado, ligero y seguro, diseñado con una estética SaaS minimalista. Funciona bajo el principio de **Zero-Knowledge**, lo que significa que tus datos nunca salen de tu dispositivo en formato legible, incluso cuando se guardan en el servidor.
 
 ## 🚀 Características
 
-- **Cifrado Local**: Todo se cifra y descifra en tu dispositivo.
+- **Cifrado Local**: Todo se cifra y descifra en tu dispositivo utilizando AES-256.
+- **Persistencia en Servidor**: Los datos se sincronizan con un backend persistente en Docker, evitando la pérdida de datos si se borra el caché del navegador.
+- **URL de Acceso**: Guarda los enlaces directos a tus servicios para un acceso rápido.
+- **Edición de Entradas**: Modifica fácilmente el nombre, usuario, URL o proyecto de tus contraseñas existentes.
 - **Categorización por Proyectos**: Organiza tus credenciales en grupos colapsables.
-- **Sugerencias Inteligentes**: Reutiliza etiquetas de proyectos existentes.
 - **Generador de Contraseñas**: Crea claves fuertes con un solo clic.
 - **Portabilidad**: Exporta e importa tu baúl en archivos `.updb` cifrados.
-- **Docker Ready**: Despliegue inmediato con un solo comando.
+- **Docker Ready**: Despliegue con un solo comando gracias a Docker Compose.
 
-## 🛡️ Seguridad y Cifrado
+## 🛡️ Seguridad y Arquitectura
 
 La seguridad de Ultima Parole se basa en estándares criptográficos de grado militar:
 
-1.  **Derivación de Clave (PBKDF2)**: Tu "Contraseña Maestra" no se usa directamente. Se pasa por un algoritmo de derivación (PBKDF2) con un *salt* aleatorio y 10,000 iteraciones para generar una clave de 256 bits. Esto protege contra ataques de fuerza bruta.
-2.  **Cifrado AES-256-CBC**: Los datos se cifran utilizando el estándar **AES-256** en modo **CBC** (Cipher Block Chaining). Cada operación de cifrado utiliza un Vector de Inicialización (IV) único.
-3.  **Almacenamiento Local**: El baúl cifrado se guarda en el `localStorage` del navegador. Sin tu clave maestra, los datos son solo ruido aleatorio.
+1.  **Derivación de Clave (PBKDF2)**: Tu "Contraseña Maestra" se procesa mediante PBKDF2 con 10,000 iteraciones para generar la clave de cifrado.
+2.  **Cifrado AES-256-CBC**: Los datos se cifran localmente. El servidor solo recibe y almacena bloques cifrados ilegibles.
+3.  **Arquitectura de Sincronización**: Al iniciar sesión, la aplicación busca la última versión en el servidor y la sincroniza con el `localStorage`. Cualquier cambio se guarda de forma transparente en ambos lugares.
 
 ## 🛠️ Instalación y Uso
 
-### Requisitos
-- Docker y Docker Compose (opcional para producción)
-- Node.js & npm (opcional para desarrollo)
+### Despliegue con Docker (Producción)
 
-### Despliegue Rápido (Producción)
-Si estás en el servidor, simplemente ejecuta:
+Asegúrate de tener Docker y Docker Compose instalados. Luego, ejecuta:
+
 ```bash
-./deploy.sh
+sudo docker compose up -d --build
 ```
-La aplicación estará disponible en `http://localhost:3020`.
+
+La aplicación web estará disponible en el puerto `3020`. El backend de persistencia corre internamente en el puerto `3021` y guarda la información en `./server/data`.
 
 ### Desarrollo Local
-```bash
-npm install
-npm run dev -- --host
-```
+
+1.  **Frontend**:
+    ```bash
+    npm install
+    npm run dev
+    ```
+2.  **Backend**:
+    ```bash
+    cd server
+    npm install
+    node index.js
+    ```
 
 ---
 Creado por **Antigravity** para **Konstantinwdk**.
