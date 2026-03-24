@@ -29,11 +29,11 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   
   // New entry form state
-  const [newEntry, setNewEntry] = useState({ title: '', username: '', password: '', project: '', website: '', attachment: null });
+  const [newEntry, setNewEntry] = useState({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
 
   // CSV Mapping state
   const [csvPreview, setCsvPreview] = useState(null);
-  const [mapping, setMapping] = useState({ title: '', username: '', password: '', project: '', website: '' });
+  const [mapping, setMapping] = useState({ title: '', username: '', password: '', project: '', website: '', notes: '' });
   const [showMapping, setShowMapping] = useState(false);
 
   // Persistence Key
@@ -153,7 +153,7 @@ export default function App() {
     }
 
     handleSaveVault(updated);
-    setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null });
+    setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
     setIsAdding(false);
   };
 
@@ -195,7 +195,8 @@ export default function App() {
       password: entry.password, 
       project: entry.project || '', 
       website: entry.website || '',
-      attachment: entry.attachment || null
+      attachment: entry.attachment || null,
+      notes: entry.notes || ''
     });
     setEditingId(entry.id);
     setIsAdding(true);
@@ -282,6 +283,7 @@ export default function App() {
         if (lowerH.includes('contrase') || lowerH.includes('pass')) newMapping.password = h;
         if (lowerH.includes('proyecto') || lowerH.includes('tag') || lowerH.includes('project')) newMapping.project = h;
         if (lowerH.includes('enlace') || lowerH.includes('url') || lowerH.includes('web')) newMapping.website = h;
+        if (lowerH.includes('nota') || lowerH.includes('comment') || lowerH.includes('info')) newMapping.notes = h;
       });
       
       setMapping(newMapping);
@@ -413,7 +415,7 @@ export default function App() {
           if (isAdding) {
             setIsAdding(false);
             setEditingId(null);
-            setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null });
+            setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
           } else {
             setIsAdding(true);
           }
@@ -445,6 +447,14 @@ export default function App() {
                 </datalist>
               </div>
             </div>
+            
+            <textarea 
+              placeholder="Notas / Comentarios adicionales (opcional)" 
+              className="input-field min-h-[80px] py-3 resize-none" 
+              value={newEntry.notes} 
+              onChange={e => setNewEntry({...newEntry, notes: e.target.value})}
+            />
+
             <div className="relative group">
               <input placeholder="Contraseña" type="text" className="input-field pr-24" value={newEntry.password} onChange={e => setNewEntry({...newEntry, password: e.target.value})} required />
               <button type="button" onClick={() => setNewEntry({...newEntry, password: generatePassword()})} className="absolute right-2 top-1.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded border border-slate-700 transition-colors">
@@ -482,7 +492,7 @@ export default function App() {
                   onClick={() => {
                     setEditingId(null);
                     setIsAdding(false);
-                    setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null });
+                    setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
                   }} 
                   className="btn-secondary px-4 h-10"
                 >
@@ -535,6 +545,11 @@ export default function App() {
                                 </a>
                               )}
                             </div>
+                            {p.notes && (
+                              <p className="text-[10px] text-slate-600 mt-1 line-clamp-2 italic border-l border-slate-800 pl-2 leading-relaxed">
+                                {p.notes}
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -613,7 +628,8 @@ export default function App() {
                   { key: 'username', label: 'Usuario / Email' },
                   { key: 'password', label: 'Contraseña', required: true },
                   { key: 'website', label: 'URL / Sitio Web' },
-                  { key: 'project', label: 'Proyecto / Tag' }
+                  { key: 'project', label: 'Proyecto / Tag' },
+                  { key: 'notes', label: 'Notas / Comentarios' }
                 ].map(field => (
                   <div key={field.key} className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-slate-300">
