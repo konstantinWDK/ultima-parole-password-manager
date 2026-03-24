@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Lock, Unlock, Plus, Trash2, Copy, Eye, EyeOff, Search, 
-  Download, Upload, Shield, LogOut, Key, Check, AlertCircle, ChevronDown, ChevronRight, Folder
+  Download, Upload, Shield, LogOut, Key, Check, AlertCircle, ChevronDown, ChevronRight, Folder,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { encryptData, decryptData, generatePassword } from './services/crypto';
@@ -99,7 +100,8 @@ export default function App() {
     const filtered = passwords.filter(p => 
       p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.project?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.username?.toLowerCase().includes(searchTerm.toLowerCase())
+      p.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.website?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const groups = filtered.reduce((acc, p) => {
@@ -225,9 +227,10 @@ export default function App() {
             initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
             onSubmit={addEntry} className="glass-card mb-8 border-slate-800/40 p-5 space-y-4 overflow-hidden"
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <input placeholder="Nombre (Ej: GitHub)" className="input-field" value={newEntry.title} onChange={e => setNewEntry({...newEntry, title: e.target.value})} required />
               <input placeholder="Usuario / Email" className="input-field" value={newEntry.username} onChange={e => setNewEntry({...newEntry, username: e.target.value})} />
+              <input placeholder="URL de acceso" className="input-field" value={newEntry.website} onChange={e => setNewEntry({...newEntry, website: e.target.value})} />
               <div className="relative">
                 <input 
                   placeholder="Proyecto / Tag" 
@@ -280,7 +283,19 @@ export default function App() {
                           <div className="w-1.5 h-1.5 rounded-full bg-slate-800 group-hover:bg-primary-500/40 transition-colors" />
                           <div className="min-w-0">
                             <h3 className="text-sm font-medium text-slate-200 truncate">{p.title}</h3>
-                            <p className="text-[10px] text-slate-500 truncate">{p.username || '—'}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-[10px] text-slate-500 truncate">{p.username || '—'}</p>
+                              {p.website && (
+                                <a 
+                                  href={p.website.startsWith('http') ? p.website : `https://${p.website}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] text-primary-500/60 hover:text-primary-400 flex items-center gap-0.5 transition-colors"
+                                >
+                                  <ExternalLink size={8} /> URL
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
 
