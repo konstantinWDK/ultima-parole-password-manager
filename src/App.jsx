@@ -18,6 +18,7 @@ export default function App() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLogged, setIsLogged] = useState(false);
   const [isNewVault, setIsNewVault] = useState(false);
+  const [vaultExistsOnServer, setVaultExistsOnServer] = useState(false);
   const [passwords, setPasswords] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -30,57 +31,93 @@ export default function App() {
   // New entry form state
   const [newEntry, setNewEntry] = useState({ title: '', username: '', password: '', project: '', website: '' });
 
+  // CSV Mapping state
+  const [csvPreview, setCsvPreview] = useState(null);
+  const [mapping, setMapping] = useState({ title: '', username: '', password: '', project: '', website: '' });
+  const [showMapping, setShowMapping] = useState(false);
+
   // Persistence Key
   const STORAGE_KEY = 'ultima_parole_vault';
   const API_BASE = `http://${window.location.hostname || 'localhost'}:3021/api`;
 
   // Check if vault exists
   useEffect(() => {
-    setIsNewVault(!localStorage.getItem(STORAGE_KEY));
+    const checkVault = async () => {
+      const localExists = !!localStorage.getItem(STORAGE_KEY);
+      let serverExists = false;
+      try {
+        const resp = await fetch(`${API_BASE}/vault`);
+        serverExists = resp.ok;
+      } catch (e) {}
+      
+      setVaultExistsOnServer(serverExists);
+      setIsNewVault(!localExists && !serverExists);
+    };
+    checkVault();
   }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    
+    if (isNewVault && masterPassword !== confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      let vaultData = [];
+      let vaultData = null;
 
-      // First try to fetch from server
+      // 1. Try server
+      let serverError = false;
       try {
         const resp = await fetch(`${API_BASE}/vault`);
         if (resp.ok) {
-          vaultData = await resp.json();
+          const encrypted = await resp.json();
+          vaultData = decryptData(encrypted, masterPassword);
           console.log('Vault loaded from server');
-        } else if (saved) {
-          // If server fails but local exists, use local
-          const encryptedData = JSON.parse(saved);
-          vaultData = decryptData(encryptedData, masterPassword);
+        } else if (resp.status !== 404) {
+          serverError = true;
         }
-      } catch (e) {
-        console.error('Server sync failed, using local storage');
-        if (saved) {
-          const encryptedData = JSON.parse(saved);
-          vaultData = decryptData(encryptedData, masterPassword);
+      } catch (err) {
+        console.error("Server connection failed", err);
+        serverError = true;
+      }
+
+      // 2. Try local fallback if server failed or returned nothing
+      if (vaultData === null && saved) {
+        try {
+          const encrypted = JSON.parse(saved);
+          vaultData = decryptData(encrypted, masterPassword);
+          console.log('Vault loaded from local storage');
+        } catch (err) {
+          console.error("Local decrypt failed", err);
+          throw new Error("Contraseña incorrecta");
         }
       }
 
-      // If we have saved local but not encrypted (meaning it's the first time with server)
-      // or if we decrypted successfully
-      if (saved && vaultData.length === 0) {
-         try {
-           const encryptedData = JSON.parse(saved);
-           vaultData = decryptData(encryptedData, masterPassword);
-         } catch(e) {}
+      // 3. If still null, and it's NOT a new vault, then we failed to login
+      if (vaultData === null && !isNewVault) {
+        throw new Error("Contraseña incorrecta");
+      }
+
+      // 4. If still null but isNewVault is true, then it's a fresh start
+      if (vaultData === null) {
+        // If we couldn't reach the server and have no local data, we can't initialize securely
+        // because we might overwrite an existing server vault we can't see right now.
+        if (serverError) {
+           setError("Aviso: No se pudo contactar con el servidor. Se recomienda no inicializar un nuevo baúl para evitar sobreescrituras accidentales en el servidor.");
+        }
+        vaultData = [];
       }
 
       setPasswords(vaultData);
       setIsLogged(true);
     } catch (err) {
-      setError('Contraseña incorrecta');
+      setError(err.message || 'Contraseña incorrecta');
     }
   };
-
   const handleSaveVault = async (updatedPasswords) => {
     const encrypted = encryptData(updatedPasswords, masterPassword);
     
@@ -182,6 +219,74 @@ export default function App() {
     a.click();
   };
 
+  const handleCSVImport = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) return;
+
+      const headers = lines[0].split(',').map(h => h.trim());
+      const rows = lines.slice(1).map(line => {
+        const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
+        return (values || []).map(v => v.replace(/^"|"$/g, '').trim());
+      });
+
+      setCsvPreview({ headers, rows });
+      
+      // Auto-mapping logic
+      const newMapping = { title: '', username: '', password: '', project: '', website: '' };
+      headers.forEach((h, i) => {
+        const lowerH = h.toLowerCase();
+        if (lowerH.includes('nombre') || lowerH.includes('title')) newMapping.title = h;
+        if (lowerH.includes('usuario') || lowerH.includes('user') || lowerH.includes('log')) newMapping.username = h;
+        if (lowerH.includes('correo') || lowerH.includes('email') && !newMapping.username) newMapping.username = h;
+        if (lowerH.includes('contrase') || lowerH.includes('pass')) newMapping.password = h;
+        if (lowerH.includes('proyecto') || lowerH.includes('tag') || lowerH.includes('project')) newMapping.project = h;
+        if (lowerH.includes('enlace') || lowerH.includes('url') || lowerH.includes('web')) newMapping.website = h;
+      });
+      
+      setMapping(newMapping);
+      setShowMapping(true);
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset input
+  };
+
+  const executeImport = () => {
+    const { headers, rows } = csvPreview;
+    const newEntries = [];
+    
+    rows.forEach((row, i) => {
+      const entry = { title: '', username: '', password: '', project: '', website: '' };
+      
+      Object.entries(mapping).forEach(([field, colName]) => {
+        if (!colName) return;
+        const colIndex = headers.indexOf(colName);
+        if (colIndex !== -1) entry[field] = row[colIndex] || '';
+      });
+
+      if (entry.title && entry.password) {
+        newEntries.push({
+          ...entry,
+          id: Date.now() + i
+        });
+      }
+    });
+
+    if (newEntries.length > 0) {
+      handleSaveVault([...passwords, ...newEntries]);
+      alert(`${newEntries.length} entradas importadas correctamente.`);
+      setShowMapping(false);
+      setCsvPreview(null);
+    } else {
+      alert("No se encontraron entradas válidas para importar.");
+    }
+  };
+
   if (!isLogged) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950">
@@ -193,7 +298,7 @@ export default function App() {
           <form onSubmit={handleLogin} className="space-y-4">
             <input
               type="password"
-              placeholder={isNewVault ? "Nueva Contraseña Maestra" : "Contraseña Maestra"}
+              placeholder={isNewVault ? "Nueva Contraseña Maestra" : (vaultExistsOnServer && !localStorage.getItem(STORAGE_KEY) ? "Contraseña del Servidor" : "Contraseña Maestra")}
               className="input-field"
               value={masterPassword}
               onChange={(e) => setMasterPassword(e.target.value)}
@@ -212,7 +317,7 @@ export default function App() {
             )}
             {error && <p className="text-red-400 text-xs text-center">{error}</p>}
             <button type="submit" className="btn-primary w-full shadow-none border border-primary-500/20">
-              {isNewVault ? "Inicializar Vault" : "Desbloquear"}
+              {isNewVault ? "Inicializar Vault" : (vaultExistsOnServer && !localStorage.getItem(STORAGE_KEY) ? "Sincronizar y Desbloquear" : "Desbloquear")}
             </button>
           </form>
           <div className="mt-6 pt-6 border-t border-slate-900 flex justify-center">
@@ -245,6 +350,10 @@ export default function App() {
           <h1 className="text-xl font-bold tracking-tight">Vault</h1>
         </div>
         <div className="flex items-center gap-3">
+          <label className="btn-secondary px-3 py-1.5 text-xs cursor-pointer flex items-center gap-1.5">
+            <Upload size={14} /> Importar CSV
+            <input type="file" hidden accept=".csv" onChange={handleCSVImport} />
+          </label>
           <button onClick={exportVault} className="btn-secondary px-3 py-1.5 text-xs">
             <Download size={14} /> Exportar
           </button>
@@ -414,6 +523,76 @@ export default function App() {
           <span>Ultima Parole V2 • Zero Knowledge Architecture</span>
         </div>
       </footer>
+
+      {/* Mapping Modal */}
+      <AnimatePresence>
+        {showMapping && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card w-full max-w-lg border-slate-800 p-6 space-y-6 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold">Mapear Columnas CSV</h2>
+                <button onClick={() => setShowMapping(false)} className="btn-icon">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <p className="text-xs text-slate-400">Selecciona qué columna de tu CSV corresponde a cada campo de Ultima Parole.</p>
+              
+              <div className="space-y-4">
+                {[
+                  { key: 'title', label: 'Nombre / Título', required: true },
+                  { key: 'username', label: 'Usuario / Email' },
+                  { key: 'password', label: 'Contraseña', required: true },
+                  { key: 'website', label: 'URL / Sitio Web' },
+                  { key: 'project', label: 'Proyecto / Tag' }
+                ].map(field => (
+                  <div key={field.key} className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-300">
+                      {field.label} {field.required && <span className="text-red-500">*</span>}
+                    </label>
+                    <select 
+                      className="input-field py-1"
+                      value={mapping[field.key]}
+                      onChange={(e) => setMapping({ ...mapping, [field.key]: e.target.value })}
+                    >
+                      <option value="">-- No mapear --</option>
+                      {csvPreview.headers.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-4 border-t border-slate-800">
+                <h3 className="text-xs font-bold mb-2 uppercase tracking-widest text-slate-500">Vista Previa (1ª fila)</h3>
+                <div className="bg-slate-900/50 rounded p-2 text-[10px] font-mono overflow-x-auto whitespace-nowrap">
+                  <div className="flex gap-2 mb-1 border-b border-slate-800 pb-1">
+                    {csvPreview.headers.map((h, i) => (
+                      <span key={i} className="text-slate-400 min-w-[80px]">{h}</span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    {csvPreview.rows[0]?.map((v, i) => (
+                      <span key={i} className="text-slate-200 min-w-[80px]">{v}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button onClick={executeImport} className="btn-primary flex-1 py-2">
+                  Confirmar Importación
+                </button>
+                <button onClick={() => setShowMapping(false)} className="btn-secondary px-6">
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

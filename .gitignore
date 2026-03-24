@@ -5,12 +5,20 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
+lerna-debug.log* 
 
 node_modules
 dist
 dist-ssr
 *.local
+
+# CSV Files (Sensitive data)
+*.csv
+*.updb
+
+# Vault data (Sensitive)
+server/data/
+vault.json
 
 # Editor directories and files
 .vscode/*
