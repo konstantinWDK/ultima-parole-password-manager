@@ -207,8 +207,7 @@ export default function App() {
       notes: entry.notes || ''
     });
     setEditingId(entry.id);
-    setIsAdding(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setIsAdding(false); // Close the top-level "Add" form if open
   };
 
   const deleteEntry = (id) => {
@@ -443,21 +442,22 @@ export default function App() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button onClick={() => {
-          if (isAdding) {
-            setIsAdding(false);
-            setEditingId(null);
-            setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
-          } else {
-            setIsAdding(true);
-          }
-        }} className="btn-primary px-3 h-10">
-          {isAdding ? <X size={18} /> : <Plus size={18} />} <span className="hidden sm:inline">{isAdding ? "Cancelar" : "Nueva"}</span>
-        </button>
+        {!editingId && (
+          <button onClick={() => {
+            if (isAdding) {
+              setIsAdding(false);
+              setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
+            } else {
+              setIsAdding(true);
+            }
+          }} className="btn-primary px-3 h-10">
+            {isAdding ? <X size={18} /> : <Plus size={18} />} <span className="hidden sm:inline">{isAdding ? "Cancelar" : "Nueva"}</span>
+          </button>
+        )}
       </div>
 
       <AnimatePresence>
-        {isAdding && (
+        {isAdding && !editingId && (
           <motion.form 
             initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
             onSubmit={addEntry} className="glass-card mb-8 border-slate-800/40 p-5 space-y-4 overflow-hidden"
@@ -578,67 +578,130 @@ export default function App() {
                     {expandedGroups[group] !== false && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden space-y-1 pl-2">
                         {items.map(p => (
-                          <div key={p.id} className="compact-row group">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="w-1.5 h-1.5 rounded-full bg-slate-800 group-hover:bg-primary-500/40 transition-colors" />
-                              <div className="min-w-0">
-                                <h3 className="text-sm font-medium text-slate-200 truncate">{p.title}</h3>
+                          <div key={p.id}>
+                            {editingId === p.id ? (
+                              <motion.form 
+                                initial={{ opacity: 0, y: -10 }} 
+                                animate={{ opacity: 1, y: 0 }} 
+                                className="glass-card border-primary-500/50 p-4 mb-4 space-y-4 shadow-xl shadow-primary-500/5"
+                                onSubmit={addEntry}
+                              >
+                                <div className="grid grid-cols-2 gap-3">
+                                  <input placeholder="Título" className="input-field py-1 text-xs" value={newEntry.title} onChange={e => setNewEntry({...newEntry, title: e.target.value})} required />
+                                  <input placeholder="Usuario" className="input-field py-1 text-xs" value={newEntry.username} onChange={e => setNewEntry({...newEntry, username: e.target.value})} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <input placeholder="Sitio Web" className="input-field py-1 text-xs" value={newEntry.website} onChange={e => setNewEntry({...newEntry, website: e.target.value})} />
+                                  <input 
+                                    placeholder="Proyecto" 
+                                    className="input-field py-1 text-xs" 
+                                    list="project-suggestions"
+                                    value={newEntry.project} 
+                                    onChange={e => setNewEntry({...newEntry, project: e.target.value})} 
+                                  />
+                                </div>
+                                <textarea 
+                                  placeholder="Notas" 
+                                  className="input-field py-2 text-xs min-h-[60px]" 
+                                  value={newEntry.notes} 
+                                  onChange={e => setNewEntry({...newEntry, notes: e.target.value})}
+                                />
+                                <div className="relative">
+                                  <input placeholder="Contraseña" type="text" className="input-field py-1 text-xs pr-16" value={newEntry.password} onChange={e => setNewEntry({...newEntry, password: e.target.value})} required />
+                                  <button type="button" onClick={() => setNewEntry({...newEntry, password: generatePassword()})} className="absolute right-1 top-1 text-[8px] bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">GENERAR</button>
+                                </div>
                                 <div className="flex items-center gap-2">
-                                  <p className="text-[10px] text-slate-500 truncate">{p.username || '—'}</p>
-                                  {p.website && (
-                                    <a 
-                                      href={p.website.startsWith('http') ? p.website : `https://${p.website}`} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="text-[10px] text-primary-500/60 hover:text-primary-400 flex items-center gap-0.5 transition-colors"
-                                    >
-                                      <ExternalLink size={8} /> URL
-                                    </a>
+                                  <label className="flex-1">
+                                    <div className="input-field py-1 flex items-center gap-1.5 cursor-pointer hover:border-primary-500/50 transition-colors">
+                                      <Paperclip size={10} className={cn(newEntry.attachment ? "text-primary-500" : "text-slate-500")} />
+                                      <span className="text-[10px] text-slate-400 truncate">
+                                        {newEntry.attachment ? newEntry.attachment.name : "Archivo"}
+                                      </span>
+                                      <input type="file" hidden onChange={handleFileChange} />
+                                    </div>
+                                  </label>
+                                  {newEntry.attachment && (
+                                    <button type="button" onClick={() => setNewEntry({...newEntry, attachment: null})} className="p-1 text-red-500/50 hover:text-red-500"><X size={10} /></button>
                                   )}
                                 </div>
-                                {p.notes && (
-                                  <p className="text-[10px] text-slate-600 mt-1 line-clamp-2 italic border-l border-slate-800 pl-2 leading-relaxed">
-                                    {p.notes}
-                                  </p>
-                                )}
+                                <div className="flex gap-2">
+                                  <button type="submit" className="btn-primary flex-1 py-1.5 text-xs">Guardar Cambios</button>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => {
+                                      setEditingId(null);
+                                      setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
+                                    }} 
+                                    className="btn-secondary px-3 py-1.5 text-xs"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </motion.form>
+                            ) : (
+                              <div className="compact-row group">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-slate-800 group-hover:bg-primary-500/40 transition-colors" />
+                                  <div className="min-w-0">
+                                    <h3 className="text-sm font-medium text-slate-200 truncate">{p.title}</h3>
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-[10px] text-slate-500 truncate">{p.username || '—'}</p>
+                                      {p.website && (
+                                        <a 
+                                          href={p.website.startsWith('http') ? p.website : `https://${p.website}`} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="text-[10px] text-primary-500/60 hover:text-primary-400 flex items-center gap-0.5 transition-colors"
+                                        >
+                                          <ExternalLink size={8} /> URL
+                                        </a>
+                                      )}
+                                    </div>
+                                    {p.notes && (
+                                      <p className="text-[10px] text-slate-600 mt-1 line-clamp-2 italic border-l border-slate-800 pl-2 leading-relaxed">
+                                        {p.notes}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <div className="hidden sm:flex items-center bg-slate-950/50 border border-slate-900 px-2 py-1 rounded mr-2">
+                                    <input
+                                      type={showPass[p.id] ? "text" : "password"}
+                                      readOnly value={p.password}
+                                      className="bg-transparent border-none text-[11px] font-mono text-slate-400 w-24 focus:ring-0 text-center"
+                                    />
+                                  </div>
+                                  
+                                  {p.attachment && (
+                                    <button 
+                                      onClick={() => downloadAttachment(p.attachment)} 
+                                      className="btn-icon text-primary-500/80 hover:text-primary-400"
+                                      title={`Descargar ${p.attachment.name}`}
+                                    >
+                                      <FileKey size={14} />
+                                    </button>
+                                  )}
+                                  
+                                  <button onClick={() => setShowPass({...showPass, [p.id]: !showPass[p.id]})} className="btn-icon">
+                                    {showPass[p.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                  </button>
+                                  
+                                  <button onClick={() => copyToClipboard(p.password, p.id)} className={cn("btn-icon", copiedId === p.id && "text-green-500")}>
+                                    {copiedId === p.id ? <Check size={14} /> : <Copy size={14} />}
+                                  </button>
+
+                                  <button onClick={() => startEdit(p)} className="btn-icon">
+                                    <Edit2 size={14} />
+                                  </button>
+
+                                  <button onClick={() => deleteEntry(p.id)} className="btn-icon hover:text-red-500 opacity-0 group-hover:opacity-100">
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <div className="hidden sm:flex items-center bg-slate-950/50 border border-slate-900 px-2 py-1 rounded mr-2">
-                                <input
-                                  type={showPass[p.id] ? "text" : "password"}
-                                  readOnly value={p.password}
-                                  className="bg-transparent border-none text-[11px] font-mono text-slate-400 w-24 focus:ring-0 text-center"
-                                />
-                              </div>
-                              
-                              {p.attachment && (
-                                <button 
-                                  onClick={() => downloadAttachment(p.attachment)} 
-                                  className="btn-icon text-primary-500/80 hover:text-primary-400"
-                                  title={`Descargar ${p.attachment.name}`}
-                                >
-                                  <FileKey size={14} />
-                                </button>
-                              )}
-                              
-                              <button onClick={() => setShowPass({...showPass, [p.id]: !showPass[p.id]})} className="btn-icon">
-                                {showPass[p.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                              </button>
-                              
-                              <button onClick={() => copyToClipboard(p.password, p.id)} className={cn("btn-icon", copiedId === p.id && "text-green-500")}>
-                                {copiedId === p.id ? <Check size={14} /> : <Copy size={14} />}
-                              </button>
-
-                              <button onClick={() => startEdit(p)} className="btn-icon">
-                                <Edit2 size={14} />
-                              </button>
-
-                              <button onClick={() => deleteEntry(p.id)} className="btn-icon hover:text-red-500 opacity-0 group-hover:opacity-100">
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
+                            )}
                           </div>
                         ))}
                       </motion.div>
