@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Lock, Unlock, Plus, Trash2, Copy, Eye, EyeOff, Search, 
   Download, Upload, Shield, LogOut, Key, Check, AlertCircle, ChevronDown, ChevronRight, Folder,
-  ExternalLink, Edit2, X
+  ExternalLink, Edit2, X, Paperclip, FileKey
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { encryptData, decryptData, generatePassword } from './services/crypto';
@@ -29,7 +29,7 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   
   // New entry form state
-  const [newEntry, setNewEntry] = useState({ title: '', username: '', password: '', project: '', website: '' });
+  const [newEntry, setNewEntry] = useState({ title: '', username: '', password: '', project: '', website: '', attachment: null });
 
   // CSV Mapping state
   const [csvPreview, setCsvPreview] = useState(null);
@@ -112,7 +112,8 @@ export default function App() {
         vaultData = [];
       }
 
-      setPasswords(vaultData);
+      const finalVaultData = Array.isArray(vaultData) ? vaultData : [];
+      setPasswords(finalVaultData);
       setIsLogged(true);
     } catch (err) {
       setError(err.message || 'Contraseña incorrecta');
@@ -152,8 +153,39 @@ export default function App() {
     }
 
     handleSaveVault(updated);
-    setNewEntry({ title: '', username: '', password: '', project: '', website: '' });
+    setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null });
     setIsAdding(false);
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Limit file size to 5MB (for safety)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("El archivo es demasiado grande. Máximo 5MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setNewEntry(prev => ({
+        ...prev,
+        attachment: {
+          name: file.name,
+          data: e.target.result,
+          type: file.type
+        }
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const downloadAttachment = (attachment) => {
+    const a = document.createElement('a');
+    a.href = attachment.data;
+    a.download = attachment.name;
+    a.click();
   };
 
   const startEdit = (entry) => {
@@ -162,7 +194,8 @@ export default function App() {
       username: entry.username || '', 
       password: entry.password, 
       project: entry.project || '', 
-      website: entry.website || '' 
+      website: entry.website || '',
+      attachment: entry.attachment || null
     });
     setEditingId(entry.id);
     setIsAdding(true);
@@ -183,7 +216,8 @@ export default function App() {
   };
 
   const groupedPasswords = useMemo(() => {
-    const filtered = passwords.filter(p => 
+    const list = Array.isArray(passwords) ? passwords : [];
+    const filtered = list.filter(p => 
       p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.project?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -201,7 +235,8 @@ export default function App() {
   }, [passwords, searchTerm]);
 
   const uniqueProjects = useMemo(() => {
-    const projects = passwords.map(p => p.project?.trim()).filter(Boolean);
+    const list = Array.isArray(passwords) ? passwords : [];
+    const projects = list.map(p => p.project?.trim()).filter(Boolean);
     return [...new Set(projects)].sort();
   }, [passwords]);
 
@@ -378,7 +413,7 @@ export default function App() {
           if (isAdding) {
             setIsAdding(false);
             setEditingId(null);
-            setNewEntry({ title: '', username: '', password: '', project: '', website: '' });
+            setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null });
           } else {
             setIsAdding(true);
           }
@@ -416,6 +451,27 @@ export default function App() {
                 GENERAR
               </button>
             </div>
+            
+            <div className="flex items-center gap-3">
+              <label className="flex-1">
+                <div className="input-field flex items-center gap-2 cursor-pointer group hover:border-primary-500/50 transition-colors">
+                  <Paperclip size={14} className={cn(newEntry.attachment ? "text-primary-500" : "text-slate-500")} />
+                  <span className="text-xs text-slate-400 group-hover:text-slate-300">
+                    {newEntry.attachment ? `Archivo: ${newEntry.attachment.name}` : "Adjuntar Certificado Digital (P12, CRT...)"}
+                  </span>
+                  <input type="file" hidden onChange={handleFileChange} />
+                </div>
+              </label>
+              {newEntry.attachment && (
+                <button 
+                  type="button" 
+                  onClick={() => setNewEntry({...newEntry, attachment: null})}
+                  className="btn-icon text-red-500/50 hover:text-red-500"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
             <div className="flex gap-2">
               <button type="submit" className="btn-primary flex-1 h-10">
                 {editingId ? "Guardar Cambios" : "Guardar Seguro"}
@@ -426,7 +482,7 @@ export default function App() {
                   onClick={() => {
                     setEditingId(null);
                     setIsAdding(false);
-                    setNewEntry({ title: '', username: '', password: '', project: '', website: '' });
+                    setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null });
                   }} 
                   className="btn-secondary px-4 h-10"
                 >
@@ -491,9 +547,19 @@ export default function App() {
                              />
                           </div>
                           
-                          <button onClick={() => setShowPass({...showPass, [p.id]: !showPass[p.id]})} className="btn-icon">
-                            {showPass[p.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                          </button>
+                           {p.attachment && (
+                             <button 
+                               onClick={() => downloadAttachment(p.attachment)} 
+                               className="btn-icon text-primary-500/80 hover:text-primary-400"
+                               title={`Descargar ${p.attachment.name}`}
+                             >
+                               <FileKey size={14} />
+                             </button>
+                           )}
+                           
+                           <button onClick={() => setShowPass({...showPass, [p.id]: !showPass[p.id]})} className="btn-icon">
+                             {showPass[p.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                           </button>
                           
                           <button onClick={() => copyToClipboard(p.password, p.id)} className={cn("btn-icon", copiedId === p.id && "text-green-500")}>
                             {copiedId === p.id ? <Check size={14} /> : <Copy size={14} />}
