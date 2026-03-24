@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Lock, Unlock, Plus, Trash2, Copy, Eye, EyeOff, Search, 
   Download, Upload, Shield, LogOut, Key, Check, AlertCircle, ChevronDown, ChevronRight, Folder,
-  ExternalLink, Edit2, X, Paperclip, FileKey
+  ExternalLink, Edit2, X, Paperclip, FileKey, GripVertical
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { encryptData, decryptData, generatePassword } from './services/crypto';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -30,6 +30,7 @@ export default function App() {
   
   // New entry form state
   const [newEntry, setNewEntry] = useState({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
+  const [groupOrder, setGroupOrder] = useState([]);
 
   // CSV Mapping state
   const [csvPreview, setCsvPreview] = useState(null);
@@ -112,15 +113,21 @@ export default function App() {
         vaultData = [];
       }
 
-      const finalVaultData = Array.isArray(vaultData) ? vaultData : [];
-      setPasswords(finalVaultData);
+      // Handle new vault format { passwords: [], groupOrder: [] } or legacy array
+      const finalPasswords = Array.isArray(vaultData) ? vaultData : (vaultData.passwords || []);
+      const finalGroupOrder = Array.isArray(vaultData) ? [] : (vaultData.groupOrder || []);
+
+      setPasswords(finalPasswords);
+      setGroupOrder(finalGroupOrder);
       setIsLogged(true);
     } catch (err) {
       setError(err.message || 'Contraseña incorrecta');
     }
   };
-  const handleSaveVault = async (updatedPasswords) => {
-    const encrypted = encryptData(updatedPasswords, masterPassword);
+  const handleSaveVault = async (updatedPasswords, updatedGroupOrder) => {
+    const orderToSave = updatedGroupOrder !== undefined ? updatedGroupOrder : groupOrder;
+    const vaultObject = { passwords: updatedPasswords, groupOrder: orderToSave };
+    const encrypted = encryptData(vaultObject, masterPassword);
     
     // Save to local storage
     localStorage.setItem(STORAGE_KEY, JSON.stringify(encrypted));
@@ -137,6 +144,7 @@ export default function App() {
     }
 
     setPasswords(updatedPasswords);
+    if (updatedGroupOrder !== undefined) setGroupOrder(updatedGroupOrder);
     setIsNewVault(false);
   };
 
@@ -251,6 +259,23 @@ export default function App() {
   const toggleGroup = (group) => {
     setExpandedGroups(prev => ({ ...prev, [group]: !prev[group] }));
   };
+
+  const handleReorder = (newOrder) => {
+    handleSaveVault(passwords, newOrder);
+  };
+
+  const sortedGroupNames = useMemo(() => {
+    const projects = Object.keys(groupedPasswords);
+    // Sort projects: first by groupOrder, then alphabetically for new ones
+    return projects.sort((a, b) => {
+      const idxA = groupOrder.indexOf(a);
+      const idxB = groupOrder.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+  }, [groupedPasswords, groupOrder]);
 
   const exportVault = () => {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -518,103 +543,111 @@ export default function App() {
             <p className="text-sm">El baúl está vacío</p>
           </div>
         ) : (
-          Object.entries(groupedPasswords).sort().map(([group, items]) => (
-            <div key={group} className="space-y-1 group/header">
-              <div 
-                onClick={() => toggleGroup(group)}
-                className="flex items-center gap-2 w-full text-left py-2 px-1 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
-              >
-                {expandedGroups[group] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                <Folder size={14} className={cn(group === 'General' ? "text-slate-600" : "text-primary-500/50")} />
-                <span className="text-xs font-semibold uppercase tracking-widest">{group}</span>
-                <span className="text-[10px] bg-slate-900 border border-slate-800 px-1.5 rounded-full">{items.length}</span>
-                
-                <div className="flex-1" />
-                
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteGroup(group);
-                  }}
-                  className="opacity-0 group-hover/header:opacity-100 p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded transition-all"
-                  title={`Eliminar grupo ${group}`}
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
+          <Reorder.Group axis="y" values={sortedGroupNames} onReorder={handleReorder} className="space-y-6">
+            {sortedGroupNames.map(group => {
+              const items = groupedPasswords[group];
+              if (!items) return null;
               
-              <AnimatePresence initial={false}>
-                {expandedGroups[group] !== false && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden space-y-1 pl-2">
-                    {items.map(p => (
-                      <div key={p.id} className="compact-row group">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-800 group-hover:bg-primary-500/40 transition-colors" />
-                          <div className="min-w-0">
-                            <h3 className="text-sm font-medium text-slate-200 truncate">{p.title}</h3>
-                            <div className="flex items-center gap-2">
-                              <p className="text-[10px] text-slate-500 truncate">{p.username || '—'}</p>
-                              {p.website && (
-                                <a 
-                                  href={p.website.startsWith('http') ? p.website : `https://${p.website}`} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-[10px] text-primary-500/60 hover:text-primary-400 flex items-center gap-0.5 transition-colors"
-                                >
-                                  <ExternalLink size={8} /> URL
-                                </a>
-                              )}
+              return (
+                <Reorder.Item key={group} value={group} className="space-y-1 group/header">
+                  <div 
+                    onClick={() => toggleGroup(group)}
+                    className="flex items-center gap-2 w-full text-left py-2 px-1 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                  >
+                    <GripVertical size={14} className="text-slate-700 cursor-grab active:cursor-grabbing opacity-0 group-hover/header:opacity-100 transition-opacity" />
+                    {expandedGroups[group] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                    <Folder size={14} className={cn(group === 'General' ? "text-slate-600" : "text-primary-500/50")} />
+                    <span className="text-xs font-semibold uppercase tracking-widest">{group}</span>
+                    <span className="text-[10px] bg-slate-900 border border-slate-800 px-1.5 rounded-full">{items.length}</span>
+                    
+                    <div className="flex-1" />
+                    
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteGroup(group);
+                      }}
+                      className="opacity-0 group-hover/header:opacity-100 p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded transition-all"
+                      title={`Eliminar grupo ${group}`}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                  
+                  <AnimatePresence initial={false}>
+                    {expandedGroups[group] !== false && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden space-y-1 pl-2">
+                        {items.map(p => (
+                          <div key={p.id} className="compact-row group">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="w-1.5 h-1.5 rounded-full bg-slate-800 group-hover:bg-primary-500/40 transition-colors" />
+                              <div className="min-w-0">
+                                <h3 className="text-sm font-medium text-slate-200 truncate">{p.title}</h3>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-[10px] text-slate-500 truncate">{p.username || '—'}</p>
+                                  {p.website && (
+                                    <a 
+                                      href={p.website.startsWith('http') ? p.website : `https://${p.website}`} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-[10px] text-primary-500/60 hover:text-primary-400 flex items-center gap-0.5 transition-colors"
+                                    >
+                                      <ExternalLink size={8} /> URL
+                                    </a>
+                                  )}
+                                </div>
+                                {p.notes && (
+                                  <p className="text-[10px] text-slate-600 mt-1 line-clamp-2 italic border-l border-slate-800 pl-2 leading-relaxed">
+                                    {p.notes}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            {p.notes && (
-                              <p className="text-[10px] text-slate-600 mt-1 line-clamp-2 italic border-l border-slate-800 pl-2 leading-relaxed">
-                                {p.notes}
-                              </p>
-                            )}
+
+                            <div className="flex items-center gap-1">
+                              <div className="hidden sm:flex items-center bg-slate-950/50 border border-slate-900 px-2 py-1 rounded mr-2">
+                                <input
+                                  type={showPass[p.id] ? "text" : "password"}
+                                  readOnly value={p.password}
+                                  className="bg-transparent border-none text-[11px] font-mono text-slate-400 w-24 focus:ring-0 text-center"
+                                />
+                              </div>
+                              
+                              {p.attachment && (
+                                <button 
+                                  onClick={() => downloadAttachment(p.attachment)} 
+                                  className="btn-icon text-primary-500/80 hover:text-primary-400"
+                                  title={`Descargar ${p.attachment.name}`}
+                                >
+                                  <FileKey size={14} />
+                                </button>
+                              )}
+                              
+                              <button onClick={() => setShowPass({...showPass, [p.id]: !showPass[p.id]})} className="btn-icon">
+                                {showPass[p.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                              
+                              <button onClick={() => copyToClipboard(p.password, p.id)} className={cn("btn-icon", copiedId === p.id && "text-green-500")}>
+                                {copiedId === p.id ? <Check size={14} /> : <Copy size={14} />}
+                              </button>
+
+                              <button onClick={() => startEdit(p)} className="btn-icon">
+                                <Edit2 size={14} />
+                              </button>
+
+                              <button onClick={() => deleteEntry(p.id)} className="btn-icon hover:text-red-500 opacity-0 group-hover:opacity-100">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <div className="hidden sm:flex items-center bg-slate-950/50 border border-slate-900 px-2 py-1 rounded mr-2">
-                             <input
-                               type={showPass[p.id] ? "text" : "password"}
-                               readOnly value={p.password}
-                               className="bg-transparent border-none text-[11px] font-mono text-slate-400 w-24 focus:ring-0 text-center"
-                             />
-                          </div>
-                          
-                           {p.attachment && (
-                             <button 
-                               onClick={() => downloadAttachment(p.attachment)} 
-                               className="btn-icon text-primary-500/80 hover:text-primary-400"
-                               title={`Descargar ${p.attachment.name}`}
-                             >
-                               <FileKey size={14} />
-                             </button>
-                           )}
-                           
-                           <button onClick={() => setShowPass({...showPass, [p.id]: !showPass[p.id]})} className="btn-icon">
-                             {showPass[p.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                           </button>
-                          
-                          <button onClick={() => copyToClipboard(p.password, p.id)} className={cn("btn-icon", copiedId === p.id && "text-green-500")}>
-                            {copiedId === p.id ? <Check size={14} /> : <Copy size={14} />}
-                          </button>
-
-                          <button onClick={() => startEdit(p)} className="btn-icon">
-                            <Edit2 size={14} />
-                          </button>
-
-                          <button onClick={() => deleteEntry(p.id)} className="btn-icon hover:text-red-500 opacity-0 group-hover:opacity-100">
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          ))
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </Reorder.Item>
+              );
+            })}
+          </ Reorder.Group>
         )}
       </div>
 
