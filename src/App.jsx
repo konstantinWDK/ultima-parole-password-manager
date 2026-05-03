@@ -28,8 +28,12 @@ export default function App() {
   const [expandedGroups, setExpandedGroups] = useState({});
   const [editingId, setEditingId] = useState(null);
   
+  // Constants
+  const EMPTY_ENTRY = { title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' };
+
   // New entry form state
-  const [newEntry, setNewEntry] = useState({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
+  const [newEntry, setNewEntry] = useState(EMPTY_ENTRY);
+  const [editingEntry, setEditingEntry] = useState(EMPTY_ENTRY);
   const [groupOrder, setGroupOrder] = useState([]);
 
   // CSV Mapping state
@@ -150,22 +154,26 @@ export default function App() {
 
   const addEntry = (e) => {
     e.preventDefault();
-    if (!newEntry.title || !newEntry.password) return;
+    const isEdit = !!editingId;
+    const entryToSave = isEdit ? editingEntry : newEntry;
+    
+    if (!entryToSave.title || !entryToSave.password) return;
     
     let updated;
-    if (editingId) {
-      updated = passwords.map(p => p.id === editingId ? { ...newEntry, id: editingId } : p);
+    if (isEdit) {
+      updated = passwords.map(p => p.id === editingId ? { ...entryToSave, id: editingId } : p);
       setEditingId(null);
+      setEditingEntry(EMPTY_ENTRY);
     } else {
-      updated = [...passwords, { ...newEntry, id: Date.now() }];
+      updated = [...passwords, { ...entryToSave, id: Date.now() }];
+      setNewEntry(EMPTY_ENTRY);
+      setIsAdding(false);
     }
 
     handleSaveVault(updated);
-    setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
-    setIsAdding(false);
   };
 
-  const handleFileChange = (event) => {
+  const handleFileChange = (event, isEdit = false) => {
     const file = event.target.files[0];
     if (!file) return;
     
@@ -177,7 +185,8 @@ export default function App() {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      setNewEntry(prev => ({
+      const setter = isEdit ? setEditingEntry : setNewEntry;
+      setter(prev => ({
         ...prev,
         attachment: {
           name: file.name,
@@ -197,7 +206,7 @@ export default function App() {
   };
 
   const startEdit = (entry) => {
-    setNewEntry({ 
+    setEditingEntry({ 
       title: entry.title, 
       username: entry.username || '', 
       password: entry.password, 
@@ -214,6 +223,10 @@ export default function App() {
     if (confirm('¿Eliminar entrada?')) {
       const updated = passwords.filter(p => p.id !== id);
       handleSaveVault(updated);
+      if (id === editingId) {
+        setEditingId(null);
+        setEditingEntry(EMPTY_ENTRY);
+      }
     }
   };
 
@@ -442,18 +455,17 @@ export default function App() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        {!editingId && (
-          <button onClick={() => {
-            if (isAdding) {
-              setIsAdding(false);
-              setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
-            } else {
-              setIsAdding(true);
-            }
-          }} className="btn-primary px-3 h-10">
-            {isAdding ? <X size={18} /> : <Plus size={18} />} <span className="hidden sm:inline">{isAdding ? "Cancelar" : "Nueva"}</span>
-          </button>
-        )}
+        <button onClick={() => {
+          if (isAdding) {
+            setIsAdding(false);
+            setNewEntry(EMPTY_ENTRY);
+          } else {
+            setIsAdding(true);
+            setEditingId(null); // Cancel any active inline edit
+          }
+        }} className="btn-primary px-3 h-10">
+          {isAdding ? <X size={18} /> : <Plus size={18} />} <span className="hidden sm:inline">{isAdding ? "Cancelar" : "Nueva"}</span>
+        </button>
       </div>
 
       <AnimatePresence>
@@ -516,21 +528,8 @@ export default function App() {
             </div>
             <div className="flex gap-2">
               <button type="submit" className="btn-primary flex-1 h-10">
-                {editingId ? "Guardar Cambios" : "Guardar Seguro"}
+                Guardar Seguro
               </button>
-              {editingId && (
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    setEditingId(null);
-                    setIsAdding(false);
-                    setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
-                  }} 
-                  className="btn-secondary px-4 h-10"
-                >
-                  Cancelar
-                </button>
-              )}
             </div>
           </motion.form>
         )}
@@ -587,41 +586,43 @@ export default function App() {
                                 onSubmit={addEntry}
                               >
                                 <div className="grid grid-cols-2 gap-3">
-                                  <input placeholder="Título" className="input-field py-1 text-xs" value={newEntry.title} onChange={e => setNewEntry({...newEntry, title: e.target.value})} required />
-                                  <input placeholder="Usuario" className="input-field py-1 text-xs" value={newEntry.username} onChange={e => setNewEntry({...newEntry, username: e.target.value})} />
+                                  <input placeholder="Título" className="input-field py-1 text-xs" value={editingEntry.title} onChange={e => setEditingEntry({...editingEntry, title: e.target.value})} required />
+                                  <input placeholder="Usuario" className="input-field py-1 text-xs" value={editingEntry.username} onChange={e => setEditingEntry({...editingEntry, username: e.target.value})} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
-                                  <input placeholder="Sitio Web" className="input-field py-1 text-xs" value={newEntry.website} onChange={e => setNewEntry({...newEntry, website: e.target.value})} />
-                                  <input 
-                                    placeholder="Proyecto" 
-                                    className="input-field py-1 text-xs" 
-                                    list="project-suggestions"
-                                    value={newEntry.project} 
-                                    onChange={e => setNewEntry({...newEntry, project: e.target.value})} 
-                                  />
+                                  <input placeholder="Sitio Web" className="input-field py-1 text-xs" value={editingEntry.website} onChange={e => setEditingEntry({...editingEntry, website: e.target.value})} />
+                                  <div className="relative">
+                                    <input 
+                                      placeholder="Proyecto" 
+                                      className="input-field py-1 text-xs w-full" 
+                                      list="project-suggestions"
+                                      value={editingEntry.project} 
+                                      onChange={e => setEditingEntry({...editingEntry, project: e.target.value})} 
+                                    />
+                                  </div>
                                 </div>
                                 <textarea 
                                   placeholder="Notas" 
                                   className="input-field py-2 text-xs min-h-[60px]" 
-                                  value={newEntry.notes} 
-                                  onChange={e => setNewEntry({...newEntry, notes: e.target.value})}
+                                  value={editingEntry.notes} 
+                                  onChange={e => setEditingEntry({...editingEntry, notes: e.target.value})}
                                 />
                                 <div className="relative">
-                                  <input placeholder="Contraseña" type="text" className="input-field py-1 text-xs pr-16" value={newEntry.password} onChange={e => setNewEntry({...newEntry, password: e.target.value})} required />
-                                  <button type="button" onClick={() => setNewEntry({...newEntry, password: generatePassword()})} className="absolute right-1 top-1 text-[8px] bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">GENERAR</button>
+                                  <input placeholder="Contraseña" type="text" className="input-field py-1 text-xs pr-16" value={editingEntry.password} onChange={e => setEditingEntry({...editingEntry, password: e.target.value})} required />
+                                  <button type="button" onClick={() => setEditingEntry({...editingEntry, password: generatePassword()})} className="absolute right-1 top-1 text-[8px] bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">GENERAR</button>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <label className="flex-1">
                                     <div className="input-field py-1 flex items-center gap-1.5 cursor-pointer hover:border-primary-500/50 transition-colors">
-                                      <Paperclip size={10} className={cn(newEntry.attachment ? "text-primary-500" : "text-slate-500")} />
+                                      <Paperclip size={10} className={cn(editingEntry.attachment ? "text-primary-500" : "text-slate-500")} />
                                       <span className="text-[10px] text-slate-400 truncate">
-                                        {newEntry.attachment ? newEntry.attachment.name : "Archivo"}
+                                        {editingEntry.attachment ? editingEntry.attachment.name : "Archivo"}
                                       </span>
-                                      <input type="file" hidden onChange={handleFileChange} />
+                                      <input type="file" hidden onChange={(e) => handleFileChange(e, true)} />
                                     </div>
                                   </label>
-                                  {newEntry.attachment && (
-                                    <button type="button" onClick={() => setNewEntry({...newEntry, attachment: null})} className="p-1 text-red-500/50 hover:text-red-500"><X size={10} /></button>
+                                  {editingEntry.attachment && (
+                                    <button type="button" onClick={() => setEditingEntry({...editingEntry, attachment: null})} className="p-1 text-red-500/50 hover:text-red-500"><X size={10} /></button>
                                   )}
                                 </div>
                                 <div className="flex gap-2">
@@ -630,7 +631,7 @@ export default function App() {
                                     type="button" 
                                     onClick={() => {
                                       setEditingId(null);
-                                      setNewEntry({ title: '', username: '', password: '', project: '', website: '', attachment: null, notes: '' });
+                                      setEditingEntry(EMPTY_ENTRY);
                                     }} 
                                     className="btn-secondary px-3 py-1.5 text-xs"
                                   >
