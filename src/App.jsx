@@ -478,7 +478,7 @@ export default function App() {
               <input placeholder="Nombre (Ej: GitHub)" className="input-field" value={newEntry.title} onChange={e => setNewEntry({...newEntry, title: e.target.value})} required />
               <input placeholder="Usuario / Email" className="input-field" value={newEntry.username} onChange={e => setNewEntry({...newEntry, username: e.target.value})} />
               <input placeholder="URL de acceso" className="input-field" value={newEntry.website} onChange={e => setNewEntry({...newEntry, website: e.target.value})} />
-              <div className="relative">
+              <div className="relative space-y-2">
                 <input 
                   placeholder="Proyecto / Tag" 
                   list="project-suggestions"
@@ -489,6 +489,25 @@ export default function App() {
                 <datalist id="project-suggestions">
                   {uniqueProjects.map(p => <option key={p} value={p} />)}
                 </datalist>
+                {uniqueProjects.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {uniqueProjects.map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setNewEntry({...newEntry, project: p})}
+                        className={cn(
+                          "px-2 py-0.5 rounded text-[10px] border transition-colors",
+                          newEntry.project === p 
+                            ? "bg-primary-500/20 border-primary-500/50 text-primary-400" 
+                            : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-400"
+                        )}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             
@@ -591,7 +610,7 @@ export default function App() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                   <input placeholder="Sitio Web" className="input-field py-1 text-xs" value={editingEntry.website} onChange={e => setEditingEntry({...editingEntry, website: e.target.value})} />
-                                  <div className="relative">
+                                  <div className="relative space-y-1.5">
                                     <input 
                                       placeholder="Proyecto" 
                                       className="input-field py-1 text-xs w-full" 
@@ -599,6 +618,25 @@ export default function App() {
                                       value={editingEntry.project} 
                                       onChange={e => setEditingEntry({...editingEntry, project: e.target.value})} 
                                     />
+                                    {uniqueProjects.length > 0 && (
+                                      <div className="flex flex-wrap gap-1">
+                                        {uniqueProjects.map(proj => (
+                                          <button
+                                            key={proj}
+                                            type="button"
+                                            onClick={() => setEditingEntry({...editingEntry, project: proj})}
+                                            className={cn(
+                                              "px-1.5 py-0.5 rounded text-[9px] border transition-colors",
+                                              editingEntry.project === proj 
+                                                ? "bg-primary-500/20 border-primary-500/50 text-primary-400" 
+                                                : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-400"
+                                            )}
+                                          >
+                                            {proj}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 <textarea 
