@@ -7,8 +7,6 @@ services:
     ports:
       - "3020:80"
     restart: unless-stopped
-    networks:
-      - caddy_net
     depends_on:
       - ultima-parole-backend
 
@@ -20,9 +18,4 @@ services:
     volumes:
       - ./server/data:/app/data
     restart: unless-stopped
-    networks:
-      - caddy_net
 
-networks:
-  caddy_net:
-    external: true
